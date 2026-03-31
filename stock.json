@@ -1,0 +1,33 @@
+{
+  "premium": [
+    {
+      "email": "+54 2995818314",
+      "pass": "facundo2000"
+    },
+    {
+      "email": "rosalia.elola.rubio@gmail.com",
+      "pass": "Julia.18"
+    }
+  ],
+  "mail": [],
+  "delivered": [
+    {
+      "type": "premium",
+      "email": "rosalia.elola.rubio@gmail.com",
+      "pass": "Julia.18",
+      "delivered_at": "2026-03-31T16:07:13.440Z",
+      "user_id": 8581752957,
+      "user_name": "SATORU",
+      "username": "Mr_Satoruu"
+    },
+    {
+      "type": "premium",
+      "email": "+886 0988011483",
+      "pass": "Ben150774",
+      "delivered_at": "2026-03-31T16:31:34.688Z",
+      "user_id": "7722245610",
+      "user_name": "кℌ KAMEN",
+      "username": "Zixkk1"
+    }
+  ]
+}

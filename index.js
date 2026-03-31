@@ -1272,10 +1272,11 @@ startApp();
 const TelegramBot = require("node-telegram-bot-api");
 const express = require("express");
 
+// Telegram bot
 const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
-// Simple test command
+// Test message
 bot.on("message", (msg) => {
   bot.sendMessage(msg.chat.id, "Bot working 🚀");
 });
@@ -1287,6 +1288,7 @@ app.get("/", (req, res) => {
   res.send("Bot is running 🚀");
 });
 
+// ⚠️ IMPORTANT: PORT sirf yahi ek baar
 const PORT = process.env.PORT || 10000;
 
 app.listen(PORT, () => {

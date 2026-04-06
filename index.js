@@ -324,18 +324,6 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
 
   await saveUsers();
 
-  if (created) {
-    logToChannel(
-      [
-        "New User Notification",
-        "",
-        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
-        `User ID: ${user.id}`,
-        `Total Users: ${totalUsers()}`
-      ].join("\n")
-    );
-  }
-
   await sendPhotoSafe(
     id,
     START_PHOTO,
@@ -385,6 +373,8 @@ bot.on("callback_query", async (query) => {
       return;
     }
 
+    const wasJoined = Boolean(user.joined);
+
     if (user.referredBy && !user.refRewardGiven && users[user.referredBy]) {
       users[user.referredBy].points += REFER_POINTS;
       users[user.referredBy].refers += 1;
@@ -400,6 +390,18 @@ bot.on("callback_query", async (query) => {
 
     user.joined = true;
     await saveUsers();
+
+    if (!wasJoined) {
+      logToChannel(
+        [
+          "New User Notification",
+          "",
+          `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+          `User ID: ${user.id}`,
+          `Total Users: ${totalUsers()}`
+        ].join("\n")
+      );
+    }
 
     await bot.answerCallbackQuery(query.id, { text: "Joined checked ✅" });
 
@@ -489,8 +491,7 @@ Premium items are currently unavailable.`,
         "",
         `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
         `User ID: ${user.id}`,
-        "Item: Premium",
-        `Link: ${premiumLink}`
+        "Item: Premium"
       ].join("\n")
     );
 
@@ -587,8 +588,7 @@ Mail items are currently unavailable.`,
         "",
         `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
         `User ID: ${user.id}`,
-        "Item: Mail",
-        `Link: ${mailLink}`
+        "Item: Mail"
       ].join("\n")
     );
 

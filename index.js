@@ -98,8 +98,10 @@ function ownerMention() {
 // ========= HELPERS =========
 function getUser(id, name = "User", username = "") {
   const key = String(id);
+  let created = false;
 
   if (!users[key]) {
+    created = true;
     users[key] = {
       id: key,
       name,
@@ -108,6 +110,7 @@ function getUser(id, name = "User", username = "") {
       refers: 0,
       referredBy: null,
       refRewardGiven: false,
+      joined: false,
       redeemed: [],
       awaitingMailSubmission: false,
       awaitingProof: false,
@@ -119,15 +122,15 @@ function getUser(id, name = "User", username = "") {
     });
   }
 
-  return users[key];
+  return { user: users[key], created };
 }
 
 function updateUser(msg) {
-  const id = String(msg.chat.id);
+  const id = String(msg.from.id);
   const name = msg.from.first_name || "User";
   const username = msg.from.username || "";
 
-  const user = getUser(id, name, username);
+  const { user } = getUser(id, name, username);
   user.name = name;
   user.username = username;
   saveUsers().catch((error) => {
@@ -137,7 +140,7 @@ function updateUser(msg) {
 }
 
 function totalUsers() {
-  return Object.keys(users).length;
+  return Object.values(users).filter((user) => user && user.joined).length;
 }
 
 function isOwner(msg) {
@@ -306,12 +309,12 @@ function proofKeyboard(includeTutorial = false) {
 
 // ========= START =========
 bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
-  const id = String(msg.chat.id);
+  const id = String(msg.from.id);
   const name = msg.from.first_name || "User";
   const username = msg.from.username || "";
   const refId = match && match[1] ? String(match[1]).trim() : null;
 
-  const user = getUser(id, name, username);
+  const { user, created } = getUser(id, name, username);
   user.name = name;
   user.username = username;
 
@@ -321,15 +324,17 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
 
   await saveUsers();
 
-  logToChannel(
-    [
-      "New User Notification",
-      "",
-      `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
-      `User ID: ${user.id}`,
-      `Total Users: ${totalUsers()}`
-    ].join("\n")
-  );
+  if (created) {
+    logToChannel(
+      [
+        "New User Notification",
+        "",
+        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+        `User ID: ${user.id}`,
+        `Total Users: ${totalUsers()}`
+      ].join("\n")
+    );
+  }
 
   await sendPhotoSafe(
     id,
@@ -364,7 +369,7 @@ bot.on("callback_query", async (query) => {
   const name = query.from.first_name || "User";
   const username = query.from.username || "";
 
-  const user = getUser(id, name, username);
+  const { user } = getUser(id, name, username);
   user.name = name;
   user.username = username;
   await saveUsers();
@@ -392,6 +397,9 @@ bot.on("callback_query", async (query) => {
         htmlOptions()
       ).catch(() => {});
     }
+
+    user.joined = true;
+    await saveUsers();
 
     await bot.answerCallbackQuery(query.id, { text: "Joined checked ✅" });
 

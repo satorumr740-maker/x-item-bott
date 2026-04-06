@@ -43,6 +43,35 @@ function normalizeStock(value) {
   return stock;
 }
 
+function normalizeUsers(value) {
+  const users = value && typeof value === "object" ? value : {};
+
+  for (const key of Object.keys(users)) {
+    const user = users[key] && typeof users[key] === "object" ? users[key] : {};
+
+    user.id = String(user.id || key);
+    user.name = user.name || "User";
+    user.username = user.username || "";
+    user.points = Number(user.points || 0);
+    user.refers = Number(user.refers || 0);
+    user.referredBy = user.referredBy ? String(user.referredBy) : null;
+    user.refRewardGiven = Boolean(user.refRewardGiven);
+    user.redeemed = Array.isArray(user.redeemed) ? user.redeemed : [];
+    user.awaitingMailSubmission = Boolean(user.awaitingMailSubmission);
+    user.awaitingProof = Boolean(user.awaitingProof);
+    user.lastClaimType = user.lastClaimType || null;
+    user.submittedMail = user.submittedMail || "";
+
+    if (typeof user.joined !== "boolean") {
+      user.joined = Boolean(user.refRewardGiven || user.points > 0 || user.refers > 0 || user.redeemed.length > 0);
+    }
+
+    users[key] = user;
+  }
+
+  return users;
+}
+
 const state = {
   users: {},
   codes: {},
@@ -96,7 +125,7 @@ async function persistDocument(id, value) {
 }
 
 async function initStorage() {
-  state.users = readLocalJson(USERS_FILE, {});
+  state.users = normalizeUsers(readLocalJson(USERS_FILE, {}));
   state.codes = readLocalJson(CODES_FILE, {});
   state.stock = normalizeStock(readLocalJson(STOCK_FILE, defaultStock()));
 
@@ -124,7 +153,7 @@ async function initStorage() {
   let migratedFromLocal = false;
 
   if (byId.users && typeof byId.users === "object") {
-    state.users = byId.users;
+    state.users = normalizeUsers(byId.users);
   } else {
     await persistDocument("users", state.users);
     migratedFromLocal = migratedFromLocal || Object.keys(state.users).length > 0;

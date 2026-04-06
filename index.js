@@ -24,6 +24,7 @@ const REFER_PHOTO = path.join(__dirname, "refer.jpg");
 const GIFT_PHOTO = path.join(__dirname, "gift.jpg");
 const WITHDRAW_PHOTO = path.join(__dirname, "balance.jpg");
 const BROADCAST_PHOTO = path.join(__dirname, "broadcast.jpg");
+const LOGIN_TUTORIAL_VIDEO = path.join(__dirname, "netflix-login-tutorial.mp4");
 
 let users = {};
 let codes = {};
@@ -43,11 +44,11 @@ const CHECK_CHANNEL = (process.env.CHECK_CHANNEL || "").trim();
 const LOG_CHANNEL = (process.env.LOG_CHANNEL || "").trim();
 const PROOF_CHANNEL = (process.env.PROOF_CHANNEL || "").trim();
 
-const CHANNEL_MAIN = (process.env.CHANNEL_MAIN || "").trim();
-const CHANNEL_1 = (process.env.CHANNEL_1 || "").trim();
-const CHANNEL_2 = (process.env.CHANNEL_2 || "").trim();
-const CHANNEL_3 = (process.env.CHANNEL_3 || "").trim();
-const CHANNEL_4 = (process.env.CHANNEL_4 || "").trim();
+const CHANNEL_MAIN = "https://t.me/+Zjl-KUen6gtmNGJl";
+const CHANNEL_1 = "https://t.me/+iB_Ev7sxfYRiYjZl";
+const CHANNEL_2 = "https://t.me/backupheres";
+const CHANNEL_3 = "https://t.me/+52hVAKUHLgdkNzY1";
+const CHANNEL_4 = "https://t.me/+rWWdk-KXyp0xMjdl";
 
 const REFER_POINTS = Number(process.env.REFER_POINTS || 1);
 const WITHDRAW_PREMIUM_POINTS = Number(process.env.WITHDRAW_PREMIUM_POINTS || 3);
@@ -107,7 +108,11 @@ function getUser(id, name = "User", username = "") {
       refers: 0,
       referredBy: null,
       refRewardGiven: false,
-      redeemed: []
+      redeemed: [],
+      awaitingMailSubmission: false,
+      awaitingProof: false,
+      lastClaimType: null,
+      submittedMail: ""
     };
     saveUsers().catch((error) => {
       console.error("Failed to save users:", error.message);
@@ -163,6 +168,18 @@ function sendPhotoSafe(chatId, photoPath, caption, extra = {}) {
     }
   } catch (error) {
     console.error(`Unable to send photo ${photoPath}:`, error.message);
+  }
+
+  return bot.sendMessage(chatId, caption, htmlOptions(extra));
+}
+
+function sendVideoSafe(chatId, videoPath, caption, extra = {}) {
+  try {
+    if (fs.existsSync(videoPath) && fs.statSync(videoPath).size > 0) {
+      return bot.sendVideo(chatId, videoPath, htmlOptions({ caption, ...extra }));
+    }
+  } catch (error) {
+    console.error(`Unable to send video ${videoPath}:`, error.message);
   }
 
   return bot.sendMessage(chatId, caption, htmlOptions(extra));
@@ -247,10 +264,10 @@ function popStockItem(type, deliveredMeta = {}) {
   if (!stock[type] || !stock[type].length) return null;
 
   const item = stock[type].shift();
+  const link = item.link || item.email || "";
   stock.delivered.push({
     type,
-    email: item.email,
-    pass: item.pass,
+    link,
     delivered_at: new Date().toISOString(),
     ...deliveredMeta
   });
@@ -259,6 +276,32 @@ function popStockItem(type, deliveredMeta = {}) {
     console.error("Failed to save stock:", error.message);
   });
   return item;
+}
+
+function stockItemLink(item = {}) {
+  return String(item.link || item.email || "").trim();
+}
+
+function tutorialKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [[{ text: "▶️ How To Login Netflix Through Link", callback_data: "how_login_tutorial" }]]
+    }
+  };
+}
+
+function proofKeyboard(includeTutorial = false) {
+  const buttons = [];
+  if (includeTutorial) {
+    buttons.push([{ text: "▶️ How To Login Netflix Through Link", callback_data: "how_login_tutorial" }]);
+  }
+  buttons.push([{ text: "📸 Send Proof", callback_data: "send_proof" }]);
+
+  return {
+    reply_markup: {
+      inline_keyboard: buttons
+    }
+  };
 }
 
 // ========= START =========
@@ -300,13 +343,13 @@ bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "Main", url: CHANNEL_MAIN || "https://t.me" },
-            { text: "Join", url: CHANNEL_1 || "https://t.me" },
-            { text: "Join", url: CHANNEL_2 || "https://t.me" }
+            { text: "🌟 Main Channel", url: CHANNEL_MAIN || "https://t.me" },
+            { text: "🔥 Join 1", url: CHANNEL_1 || "https://t.me" },
+            { text: "🎯 Join 2", url: CHANNEL_2 || "https://t.me" }
           ],
           [
-            { text: "Join", url: CHANNEL_3 || "https://t.me" },
-            { text: "Join", url: CHANNEL_4 || "https://t.me" }
+            { text: "🚀 Join 3", url: CHANNEL_3 || "https://t.me" },
+            { text: "💎 Join 4", url: CHANNEL_4 || "https://t.me" }
           ],
           [{ text: "💎 [ JOINED ] ✨", callback_data: "joined_btn" }]
         ]
@@ -373,6 +416,27 @@ bot.on("callback_query", async (query) => {
     return bot.sendMessage(id, "❌ Withdraw cancelled.", htmlOptions(mainMenu()));
   }
 
+  if (query.data === "how_login_tutorial") {
+    await bot.answerCallbackQuery(query.id, { text: "Tutorial sending..." });
+    return sendVideoSafe(
+      id,
+      LOGIN_TUTORIAL_VIDEO,
+      "▶️ <b>How To Login Netflix Through Link</b>\n\nIs video ko dekh kar apna Netflix login complete karo.",
+      mainMenu()
+    );
+  }
+
+  if (query.data === "send_proof") {
+    user.awaitingProof = true;
+    await saveUsers();
+    await bot.answerCallbackQuery(query.id, { text: "Proof bhejo" });
+    return bot.sendMessage(
+      id,
+      "📸 <b>Proofs must send after claiming.</b>\n\nAb apna screenshot, photo, ya video proof bhejo. Main usse proof channel me post kar dunga.",
+      htmlOptions(mainMenu())
+    );
+  }
+
   if (query.data === "wd_premium") {
     await bot.answerCallbackQuery(query.id);
 
@@ -404,7 +468,36 @@ Premium items are currently unavailable.`,
     }
 
     user.points -= WITHDRAW_PREMIUM_POINTS;
+    user.lastClaimType = "premium";
+    user.awaitingProof = false;
+    user.submittedMail = "";
     await saveUsers();
+
+    const premiumLink = stockItemLink(item);
+
+    logToChannel(
+      [
+        "Auto Delivery Done",
+        "",
+        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+        `User ID: ${user.id}`,
+        "Item: Premium",
+        `Link: ${premiumLink}`
+      ].join("\n")
+    );
+
+    return bot.sendMessage(
+      id,
+      `✅ <b>Delivery successful!</b>
+
+🔗 <b>Netflix Link:</b>
+${code(premiumLink)}
+
+💎 Used: ${WITHDRAW_PREMIUM_POINTS} points
+
+📌 Niche wale button se tutorial dekh lo.`,
+      htmlOptions(proofKeyboard(true))
+    );
 
     logToChannel(
       `✅ Auto Delivery Done
@@ -441,6 +534,24 @@ Premium items are currently unavailable.`,
       );
     }
 
+    user.points -= WITHDRAW_MAIL_POINTS;
+    user.awaitingMailSubmission = true;
+    user.awaitingProof = false;
+    user.lastClaimType = "mail";
+    user.submittedMail = "";
+    await saveUsers();
+
+    return bot.sendMessage(
+      id,
+      `✅ <b>On Mail claim started.</b>
+
+💎 Used: ${WITHDRAW_MAIL_POINTS} points
+📩 Ab apna mail address bhejo.
+
+📌 Proofs must send after claiming.`,
+      htmlOptions(proofKeyboard(false))
+    );
+
     const item = popStockItem("mail", {
       user_id: user.id,
       user_name: user.name,
@@ -459,6 +570,32 @@ Mail items are currently unavailable.`,
 
     user.points -= WITHDRAW_MAIL_POINTS;
     await saveUsers();
+
+    const mailLink = stockItemLink(item);
+
+    logToChannel(
+      [
+        "Auto Delivery Done",
+        "",
+        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+        `User ID: ${user.id}`,
+        "Item: Mail",
+        `Link: ${mailLink}`
+      ].join("\n")
+    );
+
+    return bot.sendMessage(
+      id,
+      `✅ <b>Delivery successful!</b>
+
+🔗 <b>Netflix Link:</b>
+${code(mailLink)}
+
+💎 Used: ${WITHDRAW_MAIL_POINTS} points
+
+📌 Niche wale button se tutorial dekh lo.`,
+      htmlOptions(tutorialKeyboard())
+    );
 
     logToChannel(
       `✅ Auto Delivery Done
@@ -484,11 +621,75 @@ Mail items are currently unavailable.`,
 
 // ========= MESSAGE HANDLER =========
 bot.on("message", async (msg) => {
+  const user = updateUser(msg);
+  const text = typeof msg.text === "string" ? msg.text.trim() : "";
+
+  if (user.awaitingProof) {
+    const proofCaption = [
+      "New Claim Proof",
+      "",
+      `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+      `User ID: ${user.id}`,
+      `Claim Type: ${user.lastClaimType || "N/A"}`,
+      user.submittedMail ? `Submitted Mail: ${user.submittedMail}` : ""
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    try {
+      if (msg.photo && msg.photo.length) {
+        const fileId = msg.photo[msg.photo.length - 1].file_id;
+        if (PROOF_CHANNEL) await bot.sendPhoto(PROOF_CHANNEL, fileId, htmlOptions({ caption: proofCaption }));
+      } else if (msg.video) {
+        if (PROOF_CHANNEL) await bot.sendVideo(PROOF_CHANNEL, msg.video.file_id, htmlOptions({ caption: proofCaption }));
+      } else if (msg.document) {
+        if (PROOF_CHANNEL) await bot.sendDocument(PROOF_CHANNEL, msg.document.file_id, htmlOptions({ caption: proofCaption }));
+      } else if (text) {
+        if (PROOF_CHANNEL) await bot.sendMessage(PROOF_CHANNEL, `${proofCaption}\n\nProof Text:\n${escapeHtml(text)}`, htmlOptions());
+      } else {
+        return bot.sendMessage(msg.chat.id, "❌ Proof ke liye screenshot, photo, video, document, ya text bhejo.", htmlOptions(mainMenu()));
+      }
+
+      user.awaitingProof = false;
+      await saveUsers();
+      return bot.sendMessage(msg.chat.id, "✅ Proof received. Proof channel me post kar diya gaya hai.", htmlOptions(mainMenu()));
+    } catch (error) {
+      console.error("Failed to send proof:", error.message);
+      return bot.sendMessage(msg.chat.id, "❌ Proof send nahi hua. Dobara try karo.", htmlOptions(mainMenu()));
+    }
+  }
+
+  if (user.awaitingMailSubmission && text && !text.startsWith("/")) {
+    user.awaitingMailSubmission = false;
+    user.submittedMail = text;
+    user.awaitingProof = true;
+    await saveUsers();
+
+    logToChannel(
+      [
+        "On Mail Claim Submitted",
+        "",
+        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+        `User ID: ${user.id}`,
+        `Mail: ${text}`,
+        `Used Points: ${WITHDRAW_MAIL_POINTS}`
+      ].join("\n")
+    );
+
+    return bot.sendMessage(
+      msg.chat.id,
+      `✅ <b>Mail submitted successfully!</b>
+
+📩 <b>Your Mail:</b> ${code(text)}
+💎 Used: ${WITHDRAW_MAIL_POINTS} points
+
+📌 Proofs must send after claiming.`,
+      htmlOptions(proofKeyboard(false))
+    );
+  }
+
   if (!msg.text) return;
   if (msg.text.startsWith("/")) return;
-
-  const text = msg.text.trim();
-  const user = updateUser(msg);
 
   if (text === "💰 Balance") {
     return sendPhotoSafe(
@@ -682,11 +883,11 @@ ${code("/gencode FREE50 50")}`,
       `Use these commands:
 
 Single add:
-${code("/addstock premium email@example.com | pass123")}
-${code("/addstock mail email@example.com | pass123")}
+${code("/addstock premium https://your-netflix-link")}
+${code("/addstock mail https://your-netflix-link")}
 
 Bulk add:
-${code("/addstockbulk premium\nemail1@example.com | pass1\nemail2@example.com | pass2")}
+${code("/addstockbulk premium\nhttps://link1\nhttps://link2")}
 
 Types allowed: premium, mail`,
       htmlOptions()
@@ -698,11 +899,9 @@ Types allowed: premium, mail`,
 
     const stock = ensureStockShape();
     const premiumPreview =
-      stock.premium.slice(0, 5).map((x, i) => `${i + 1}. ${escapeHtml(x.email)} | ${escapeHtml(x.pass)}`).join("\n") ||
-      "No premium stock";
+      stock.premium.slice(0, 5).map((x, i) => `${i + 1}. ${escapeHtml(stockItemLink(x))}`).join("\n") || "No premium stock";
     const mailPreview =
-      stock.mail.slice(0, 5).map((x, i) => `${i + 1}. ${escapeHtml(x.email)} | ${escapeHtml(x.pass)}`).join("\n") ||
-      "No mail stock";
+      stock.mail.slice(0, 5).map((x, i) => `${i + 1}. ${escapeHtml(stockItemLink(x))}`).join("\n") || "No mail stock";
 
     return bot.sendMessage(
       msg.chat.id,
@@ -745,7 +944,7 @@ Index starts from 1.`,
 
     let output = "<b>DELIVERED HISTORY (Last 10)</b>\n\n";
     last.forEach((item, index) => {
-      output += `${index + 1}. [${escapeHtml(item.type)}] ${escapeHtml(item.email)}\nUser ID: ${escapeHtml(item.user_id || "N/A")}\nDate: ${escapeHtml(item.delivered_at)}\n\n`;
+      output += `${index + 1}. [${escapeHtml(item.type)}] ${escapeHtml(stockItemLink(item))}\nUser ID: ${escapeHtml(item.user_id || "N/A")}\nDate: ${escapeHtml(item.delivered_at)}\n\n`;
     });
 
     return bot.sendMessage(msg.chat.id, output, htmlOptions());
@@ -790,11 +989,11 @@ ${code("/addpoints userId amount")}
 ${code("/gencode CODE POINTS")}
 
 3. <b>Single stock add</b>
-${code("/addstock premium email@example.com | pass123")}
-${code("/addstock mail email@example.com | pass123")}
+${code("/addstock premium https://your-netflix-link")}
+${code("/addstock mail https://your-netflix-link")}
 
 4. <b>Bulk stock add</b>
-${code("/addstockbulk premium\nemail1@example.com | pass1\nemail2@example.com | pass2")}
+${code("/addstockbulk premium\nhttps://link1\nhttps://link2")}
 
 5. <b>View stock</b>
 ${code("/stockview")}
@@ -918,15 +1117,18 @@ bot.onText(/\/gencode (.+) (\d+)/, (msg, match) => {
 });
 
 // ========= STOCK COMMANDS =========
-bot.onText(/\/addstock (premium|mail) (.+) \| (.+)/, (msg, match) => {
+bot.onText(/\/addstock (premium|mail) (.+)/, (msg, match) => {
   if (!isOwner(msg)) return;
 
   const type = match[1];
-  const email = match[2].trim();
-  const pass = match[3].trim();
+  const link = match[2].trim();
 
   const stock = ensureStockShape();
-  stock[type].push({ email, pass });
+  if (!link) {
+    return bot.sendMessage(msg.chat.id, "❌ Invalid link.");
+  }
+
+  stock[type].push({ link });
   saveStock(stock).catch((error) => {
     console.error("Failed to save stock:", error.message);
   });
@@ -947,15 +1149,11 @@ bot.onText(/\/addstockbulk (premium|mail)\n([\s\S]+)/, (msg, match) => {
   let added = 0;
 
   for (const line of lines) {
-    const parts = line.split("|");
-    if (parts.length < 2) continue;
+    const link = line.trim();
 
-    const email = parts[0].trim();
-    const pass = parts[1].trim();
+    if (!link) continue;
 
-    if (!email || !pass) continue;
-
-    stock[type].push({ email, pass });
+    stock[type].push({ link });
     added += 1;
   }
 
@@ -970,11 +1168,9 @@ bot.onText(/\/stockview/, (msg) => {
 
   const stock = ensureStockShape();
   const premiumPreview =
-    stock.premium.slice(0, 10).map((x, i) => `${i + 1}. ${escapeHtml(x.email)} | ${escapeHtml(x.pass)}`).join("\n") ||
-    "No premium stock";
+    stock.premium.slice(0, 10).map((x, i) => `${i + 1}. ${escapeHtml(stockItemLink(x))}`).join("\n") || "No premium stock";
   const mailPreview =
-    stock.mail.slice(0, 10).map((x, i) => `${i + 1}. ${escapeHtml(x.email)} | ${escapeHtml(x.pass)}`).join("\n") ||
-    "No mail stock";
+    stock.mail.slice(0, 10).map((x, i) => `${i + 1}. ${escapeHtml(stockItemLink(x))}`).join("\n") || "No mail stock";
 
   bot.sendMessage(
     msg.chat.id,
@@ -1009,7 +1205,7 @@ bot.onText(/\/removestock (premium|mail) (\d+)/, (msg, match) => {
 
   bot.sendMessage(
     msg.chat.id,
-    `✅ Removed from ${type}\n📧 ${removed.email}\n🔑 ${removed.pass}`
+    `✅ Removed from ${type}\n🔗 ${stockItemLink(removed)}`
   );
 });
 
@@ -1025,7 +1221,7 @@ bot.onText(/\/deliveredhistory/, (msg) => {
 
   let output = "<b>DELIVERED HISTORY (Last 20)</b>\n\n";
   last.forEach((item, index) => {
-    output += `${index + 1}. [${escapeHtml(item.type)}] ${escapeHtml(item.email)}\nUser ID: ${escapeHtml(item.user_id || "N/A")}\nDate: ${escapeHtml(item.delivered_at)}\n\n`;
+    output += `${index + 1}. [${escapeHtml(item.type)}] ${escapeHtml(stockItemLink(item))}\nUser ID: ${escapeHtml(item.user_id || "N/A")}\nDate: ${escapeHtml(item.delivered_at)}\n\n`;
   });
 
   bot.sendMessage(msg.chat.id, output, htmlOptions());
@@ -1045,11 +1241,11 @@ ${code("/addpoints userId amount")}
 ${code("/gencode CODE POINTS")}
 
 📦 Add Stock
-${code("/addstock premium email@example.com | pass123")}
-${code("/addstock mail email@example.com | pass123")}
+${code("/addstock premium https://your-netflix-link")}
+${code("/addstock mail https://your-netflix-link")}
 
 📦 Bulk Add Stock
-${code("/addstockbulk premium\nemail1@example.com | pass1\nemail2@example.com | pass2")}
+${code("/addstockbulk premium\nhttps://link1\nhttps://link2")}
 
 📊 Stock View
 ${code("/stockview")}
@@ -1269,28 +1465,4 @@ async function startApp() {
 }
 
 startApp();
-const TelegramBot = require("node-telegram-bot-api");
-const express = require("express");
 
-// Telegram bot
-const token = process.env.BOT_TOKEN;
-const bot = new TelegramBot(token, { polling: true });
-
-// Test message
-bot.on("message", (msg) => {
-  bot.sendMessage(msg.chat.id, "Bot working 🚀");
-});
-
-// Express server (Render ke liye)
-const app = express();
-
-app.get("/", (req, res) => {
-  res.send("Bot is running 🚀");
-});
-
-// ⚠️ IMPORTANT: PORT sirf yahi ek baar
-const PORT = process.env.PORT || 10000;
-
-app.listen(PORT, () => {
-  console.log("Server running...");
-});

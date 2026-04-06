@@ -56,15 +56,13 @@ function normalizeUsers(value) {
     user.refers = Number(user.refers || 0);
     user.referredBy = user.referredBy ? String(user.referredBy) : null;
     user.refRewardGiven = Boolean(user.refRewardGiven);
+    user.joined = typeof user.joined === "boolean" ? user.joined : Boolean(user.refRewardGiven || user.points > 0 || user.refers > 0 || user.redeemed?.length > 0);
+    user.newUserNotified = Boolean(user.newUserNotified);
     user.redeemed = Array.isArray(user.redeemed) ? user.redeemed : [];
     user.awaitingMailSubmission = Boolean(user.awaitingMailSubmission);
     user.awaitingProof = Boolean(user.awaitingProof);
     user.lastClaimType = user.lastClaimType || null;
     user.submittedMail = user.submittedMail || "";
-
-    if (typeof user.joined !== "boolean") {
-      user.joined = Boolean(user.refRewardGiven || user.points > 0 || user.refers > 0 || user.redeemed.length > 0);
-    }
 
     users[key] = user;
   }

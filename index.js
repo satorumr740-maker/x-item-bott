@@ -111,6 +111,7 @@ function getUser(id, name = "User", username = "") {
       referredBy: null,
       refRewardGiven: false,
       joined: false,
+      newUserNotified: false,
       redeemed: [],
       awaitingMailSubmission: false,
       awaitingProof: false,
@@ -307,6 +308,24 @@ function proofKeyboard(includeTutorial = false) {
   };
 }
 
+async function notifyNewUserIfNeeded(user, options = {}) {
+  if (user.newUserNotified) return;
+  const totalUsersCount = typeof options.totalUsersCount === "number" ? options.totalUsersCount : totalUsers();
+
+  logToChannel(
+    [
+      "New User Notification",
+      "",
+      `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+      `User ID: ${user.id}`,
+      `Total Users: ${totalUsersCount}`
+    ].join("\n")
+  );
+
+  user.newUserNotified = true;
+  await saveUsers();
+}
+
 // ========= START =========
 bot.onText(/\/start(?: (.+))?/, async (msg, match) => {
   const id = String(msg.from.id);
@@ -392,15 +411,7 @@ bot.on("callback_query", async (query) => {
     await saveUsers();
 
     if (!wasJoined) {
-      logToChannel(
-        [
-          "New User Notification",
-          "",
-          `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
-          `User ID: ${user.id}`,
-          `Total Users: ${totalUsers()}`
-        ].join("\n")
-      );
+      await notifyNewUserIfNeeded(user, { totalUsersCount: totalUsers() });
     }
 
     await bot.answerCallbackQuery(query.id, { text: "Joined checked ✅" });
@@ -508,25 +519,6 @@ ${code(premiumLink)}
       htmlOptions(proofKeyboard(true))
     );
 
-    logToChannel(
-      `✅ Auto Delivery Done
-
-👤 User: ${user.name}${user.username ? `\n@${user.username}` : ""}
-🪪 User ID: ${user.id}
-🎁 Item: Premium
-📧 Email: ${item.email}`
-    );
-
-    return bot.sendMessage(
-      id,
-      `✅ <b>Delivery successful!</b>
-
-📧 <b>Email:</b> ${code(item.email)}
-🔑 <b>Pass:</b> ${code(item.pass)}
-
-💎 Used: ${WITHDRAW_PREMIUM_POINTS} points`,
-      htmlOptions(mainMenu())
-    );
   }
 
   if (query.data === "wd_mail") {
@@ -561,69 +553,6 @@ ${code(premiumLink)}
       htmlOptions(proofKeyboard(false))
     );
 
-    const item = popStockItem("mail", {
-      user_id: user.id,
-      user_name: user.name,
-      username: user.username || ""
-    });
-
-    if (!item) {
-      return bot.sendMessage(
-        id,
-        `❌ <b>Out of stock</b>
-
-Mail items are currently unavailable.`,
-        htmlOptions(mainMenu())
-      );
-    }
-
-    user.points -= WITHDRAW_MAIL_POINTS;
-    await saveUsers();
-
-    const mailLink = stockItemLink(item);
-
-    logToChannel(
-      [
-        "Auto Delivery Done",
-        "",
-        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
-        `User ID: ${user.id}`,
-        "Item: Mail"
-      ].join("\n")
-    );
-
-    return bot.sendMessage(
-      id,
-      `✅ <b>Delivery successful!</b>
-
-🔗 <b>Netflix Link:</b>
-${code(mailLink)}
-
-💎 Used: ${WITHDRAW_MAIL_POINTS} points
-
-📌 Niche wale button se tutorial dekh lo.`,
-      htmlOptions(tutorialKeyboard())
-    );
-
-    logToChannel(
-      `✅ Auto Delivery Done
-
-👤 User: ${user.name}${user.username ? `\n@${user.username}` : ""}
-🪪 User ID: ${user.id}
-🎁 Item: Mail
-📧 Email: ${item.email}`
-    );
-
-    return bot.sendMessage(
-      id,
-      `✅ <b>Delivery successful!</b>
-
-📧 <b>Email:</b> ${code(item.email)}
-🔑 <b>Pass:</b> ${code(item.pass)}
-
-💎 Used: ${WITHDRAW_MAIL_POINTS} points`,
-      htmlOptions(mainMenu())
-    );
   }
 });
 

@@ -115,6 +115,7 @@ function getUser(id, name = "User", username = "") {
       redeemed: [],
       awaitingMailSubmission: false,
       awaitingProof: false,
+      awaitingSupportMessage: false,
       lastClaimType: null,
       submittedMail: ""
     };
@@ -152,6 +153,17 @@ function isOwner(msg) {
 function logToChannel(text, extra = {}) {
   if (!LOG_CHANNEL) return;
   bot.sendMessage(LOG_CHANNEL, text, extra).catch(() => {});
+}
+
+function getOwnerUserId() {
+  if (!OWNER_USERNAME) return "";
+
+  const owner = Object.values(users).find((user) => {
+    const username = String(user?.username || "").trim().replace(/^@/, "").toLowerCase();
+    return username && username === OWNER_USERNAME;
+  });
+
+  return owner ? String(owner.id) : "";
 }
 
 async function checkJoin(userId) {
@@ -625,6 +637,41 @@ bot.on("message", async (msg) => {
     );
   }
 
+  if (user.awaitingSupportMessage && text && !text.startsWith("/")) {
+    const ownerUserId = getOwnerUserId();
+    user.awaitingSupportMessage = false;
+    await saveUsers();
+
+    if (!ownerUserId) {
+      return bot.sendMessage(
+        msg.chat.id,
+        "❌ Support temporarily unavailable. Owner ko pehle bot start karna hoga.",
+        htmlOptions(mainMenu())
+      );
+    }
+
+    await bot.sendMessage(
+      ownerUserId,
+      [
+        "Support Request",
+        "",
+        `User: ${user.name}${user.username ? `\n@${user.username}` : ""}`,
+        `User ID: ${user.id}`,
+        "",
+        text,
+        "",
+        `Reply command: /replysupport ${user.id} your message`
+      ].join("\n"),
+      htmlOptions()
+    );
+
+    return bot.sendMessage(
+      msg.chat.id,
+      "✅ Support message sent. Jaldi reply aa jayega.",
+      htmlOptions(mainMenu())
+    );
+  }
+
   if (!msg.text) return;
   if (msg.text.startsWith("/")) return;
 
@@ -724,9 +771,11 @@ ${escapeHtml(refLink)}
   }
 
   if (text === "🆘 Support") {
+    user.awaitingSupportMessage = true;
+    await saveUsers();
     return bot.sendMessage(
       msg.chat.id,
-      `🆘 <b>SUPPORT</b>\n\nContact Owner 👉 ${escapeHtml(ownerMention())}`,
+      `🆘 <b>SUPPORT</b>\n\nApna message bhejo. Main directly owner tak pahuncha dunga.`,
       htmlOptions(mainMenu())
     );
   }
@@ -1051,6 +1100,29 @@ bot.onText(/\/gencode (.+) (\d+)/, (msg, match) => {
 🎁 Code: ${giftCode}
 💰 Points: ${points}`
   );
+});
+
+bot.onText(/\/replysupport (\d+) ([\s\S]+)/, (msg, match) => {
+  if (!isOwner(msg)) return;
+
+  const targetId = String(match[1]);
+  const replyText = String(match[2]).trim();
+
+  if (!users[targetId]) {
+    return bot.sendMessage(msg.chat.id, "❌ User not found.");
+  }
+
+  bot.sendMessage(
+    targetId,
+    `🆘 <b>Support Reply</b>\n\n${escapeHtml(replyText)}`,
+    htmlOptions(mainMenu())
+  )
+    .then(() => {
+      bot.sendMessage(msg.chat.id, `✅ Reply sent to ${targetId}`);
+    })
+    .catch(() => {
+      bot.sendMessage(msg.chat.id, "❌ Reply send nahi hua.");
+    });
 });
 
 // ========= STOCK COMMANDS =========

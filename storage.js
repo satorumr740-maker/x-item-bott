@@ -61,6 +61,7 @@ function normalizeUsers(value) {
     user.redeemed = Array.isArray(user.redeemed) ? user.redeemed : [];
     user.awaitingMailSubmission = Boolean(user.awaitingMailSubmission);
     user.awaitingProof = Boolean(user.awaitingProof);
+    user.awaitingSupportMessage = Boolean(user.awaitingSupportMessage);
     user.lastClaimType = user.lastClaimType || null;
     user.submittedMail = user.submittedMail || "";
 
